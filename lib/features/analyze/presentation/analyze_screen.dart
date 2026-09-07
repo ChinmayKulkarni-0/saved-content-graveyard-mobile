@@ -1,43 +1,87 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../home/home_screen.dart';
+import '../../../services/api_client.dart';
+import '../../../services/image_picker_service.dart';
+import '../../../services/share_handler.dart';
 import '../data/analysis_result.dart';
 import '../data/mock_results.dart';
 import 'result_card.dart';
 
-class AnalyzeScreen extends StatefulWidget {
+final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
+final imagePickerProvider =
+    Provider<ImagePickerService>((ref) => ImagePickerService());
+
+class AnalyzeScreen extends ConsumerStatefulWidget {
   const AnalyzeScreen({super.key});
 
   @override
-  State<AnalyzeScreen> createState() => _AnalyzeScreenState();
+  ConsumerState<AnalyzeScreen> createState() => _AnalyzeScreenState();
 }
 
 enum AnalyzeState { idle, loading, complete, error }
 
-class _AnalyzeScreenState extends State<AnalyzeScreen> {
+class _AnalyzeScreenState extends ConsumerState<AnalyzeScreen> {
   AnalyzeState _state = AnalyzeState.idle;
   AnalysisResult? _result;
   String? _errorMessage;
+  File? _currentImage;
 
-  Future<void> _handleShareIntent() async {
-    // TODO: Use share_handler to capture incoming screenshot
+  @override
+  void initState() {
+    super.initState();
+    _listenForShareIntent();
   }
 
-  Future<void> _analyzeImage(String imagePath) async {
-    setState(() => _state = AnalyzeState.loading);
+  void _listenForShareIntent() {
+    final shareHandler = ref.read(shareHandlerProvider);
+
+    shareHandler.mediaStream.listen((file) async {
+      final imageFile = await shareHandler.getFileFromMedia(file);
+      if (imageFile != null && mounted) {
+        _analyzeImage(imageFile);
+      }
+    });
+
+    shareHandler.getInitialMedia().then((file) {
+      if (file != null) {
+        shareHandler.getFileFromMedia(file).then((imageFile) {
+          if (imageFile != null && mounted) {
+            _analyzeImage(imageFile);
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _analyzeImage(File imageFile) async {
+    setState(() {
+      _state = AnalyzeState.loading;
+      _currentImage = imageFile;
+    });
 
     try {
-      // TODO: Call ApiClient.analyzeScreenshot(imagePath)
-      await Future.delayed(const Duration(seconds: 2));
-      // Rotate through mock results for demo purposes
-      final mocks = [MockResults.product, MockResults.movie, MockResults.mixed];
-      final idx = _result == null
-          ? 0
-          : (mocks.indexWhere((m) => m.id == _result!.id) + 1) % mocks.length;
+      final bytes = await imageFile.readAsBytes();
+      final filename = imageFile.path.split('/').last;
+      final apiClient = ref.read(apiClientProvider);
+
+      final result = await apiClient.analyzeScreenshot(
+        imageBytes: bytes,
+        filename: filename,
+      );
+
       setState(() {
-        _result = mocks[idx];
+        _result = result;
         _state = AnalyzeState.complete;
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        _errorMessage = e.message;
+        _state = AnalyzeState.error;
       });
     } catch (e) {
       setState(() {
@@ -47,46 +91,80 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     }
   }
 
+  Future<void> _pickFromGallery() async {
+    final picker = ref.read(imagePickerProvider);
+    final file = await picker.pickFromGallery();
+    if (file != null) {
+      _analyzeImage(file);
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    final picker = ref.read(imagePickerProvider);
+    final file = await picker.pickFromCamera();
+    if (file != null) {
+      _analyzeImage(file);
+    }
+  }
+
+  void _retry() {
+    if (_currentImage != null) {
+      _analyzeImage(_currentImage!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Analyze'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          ),
-        ),
-      ),
+      appBar: AppBar(title: const Text('Analyze')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
               switch (_state) {
-                AnalyzeState.idle => _IdleHint(onAnalyze: _analyzeImage),
+                AnalyzeState.idle => _IdleHint(
+                    onPickGallery: _pickFromGallery,
+                    onTakePhoto: _takePhoto,
+                  ),
                 AnalyzeState.loading => const _LoadingView(),
-                AnalyzeState.complete => ResultCard(
-                    key: ValueKey(_result!.id),
-                    result: _result!,
-                    onSave: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Saved to library'),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                AnalyzeState.complete => Column(
+                    children: [
+                      if (_currentImage != null) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            _currentImage!,
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                      );
-                    },
-                    onRetry: () => _analyzeImage('retry'),
+                        const SizedBox(height: 16),
+                      ],
+                      ResultCard(
+                        key: ValueKey(_result!.id),
+                        result: _result!,
+                        onSave: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Saved to library'),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          );
+                        },
+                        onRetry: _retry,
+                      ),
+                    ],
                   ),
                 AnalyzeState.error => _ErrorView(
                     message: _errorMessage ?? 'Something went wrong',
-                    onRetry: () => _analyzeImage('retry'),
+                    onRetry: _retry,
+                    onPickGallery: _pickFromGallery,
+                    onTakePhoto: _takePhoto,
                   ),
               },
             ],
@@ -100,8 +178,13 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
 // ─── Idle hint ──────────────────────────────────────────────────────────────
 
 class _IdleHint extends StatelessWidget {
-  final Function(String) onAnalyze;
-  const _IdleHint({required this.onAnalyze});
+  final VoidCallback onPickGallery;
+  final VoidCallback onTakePhoto;
+
+  const _IdleHint({
+    required this.onPickGallery,
+    required this.onTakePhoto,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -135,18 +218,21 @@ class _IdleHint extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 32),
-        FilledButton.icon(
-          onPressed: () => onAnalyze('demo'),
-          icon: const Icon(Icons.auto_awesome),
-          label: const Text('Try with mock data'),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Tap to see the Result Card in action',
-          style: TextStyle(
-            color: AppColors.textSecondary.withOpacity(0.6),
-            fontSize: 12,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FilledButton.icon(
+              onPressed: onTakePhoto,
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Take Photo'),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: onPickGallery,
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Gallery'),
+            ),
+          ],
         ),
       ],
     );
@@ -240,7 +326,15 @@ class _LoadingViewState extends State<_LoadingView>
 class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
-  const _ErrorView({required this.message, required this.onRetry});
+  final VoidCallback onPickGallery;
+  final VoidCallback onTakePhoto;
+
+  const _ErrorView({
+    required this.message,
+    required this.onRetry,
+    required this.onPickGallery,
+    required this.onTakePhoto,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -280,10 +374,21 @@ class _ErrorView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        FilledButton.icon(
-          onPressed: onRetry,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Try Again'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: onPickGallery,
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Gallery'),
+            ),
+          ],
         ),
       ],
     );

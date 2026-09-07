@@ -19,9 +19,13 @@ dependencies:
 
   # Image picking / handling
   image_picker: ^1.1.2
+  receive_sharing_intent: ^1.4.5
 
   # URL launching
   url_launcher: ^6.3.1
+
+  # Navigation
+  go_router: ^14.6.2
 
 dev_dependencies:
   flutter_test:
