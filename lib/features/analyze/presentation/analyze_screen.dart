@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../home/home_screen.dart';
 import '../data/analysis_result.dart';
 import 'result_card.dart';
 
@@ -68,16 +68,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Analyze'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          ),
-        ),
-      ),
+      appBar: AppBar(title: const Text('Analyze')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -97,9 +88,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                           color: AppColors.success.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
-                          'Processed in 1.2s',
-                          style: TextStyle(
+                        child: Text(
+                          'Processed in ${(_result!.processingTimeMs / 1000).toStringAsFixed(1)}s',
+                          style: const TextStyle(
                             color: AppColors.success,
                             fontSize: 12,
                           ),
@@ -141,7 +132,10 @@ class _IdleHint extends StatelessWidget {
         Icon(
           Icons.screenshot_rounded,
           size: 96,
-          color: AppColors.textSecondary.withOpacity(0.4),
+          color: Theme.of(context)
+              .colorScheme
+              .onSurfaceVariant
+              .withOpacity(0.4),
         ),
         const SizedBox(height: 24),
         Text(
@@ -153,7 +147,7 @@ class _IdleHint extends StatelessWidget {
           'Tap the share button in any app and choose\n"Saved Content Graveyard"',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
         const SizedBox(height: 32),
@@ -174,16 +168,21 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       children: [
-        SizedBox(height: 96),
-        CircularProgressIndicator(),
-        SizedBox(height: 24),
-        Text('Analyzing screenshot...'),
-        SizedBox(height: 8),
+        const SizedBox(height: 96),
+        const CircularProgressIndicator(),
+        const SizedBox(height: 24),
+        Text(
+          'Analyzing screenshot...',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        const SizedBox(height: 8),
         Text(
           'Identifying product and streaming options',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
         ),
       ],
     );
@@ -200,7 +199,11 @@ class _ErrorView extends StatelessWidget {
     return Column(
       children: [
         const SizedBox(height: 48),
-        const Icon(Icons.error_outline, size: 72, color: AppColors.error),
+        Icon(
+          Icons.error_outline,
+          size: 72,
+          color: Theme.of(context).colorScheme.error,
+        ),
         const SizedBox(height: 24),
         Text(message, textAlign: TextAlign.center),
         const SizedBox(height: 24),
