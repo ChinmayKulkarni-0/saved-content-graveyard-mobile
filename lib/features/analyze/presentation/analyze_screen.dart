@@ -9,6 +9,7 @@ import '../../../services/api_client.dart';
 import '../../../services/image_picker_service.dart';
 import '../../../services/share_handler.dart';
 import '../data/analysis_result.dart';
+import '../data/mock_results.dart';
 import 'result_card.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
@@ -141,29 +142,18 @@ class _AnalyzeScreenState extends ConsumerState<AnalyzeScreen> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Processed in ${_result?.processingTimeMs.toStringAsFixed(0) ?? '0'}ms',
-                          style: const TextStyle(
-                            color: AppColors.success,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       ResultCard(
+                        key: ValueKey(_result!.id),
                         result: _result!,
                         onSave: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Saved to library')),
+                            SnackBar(
+                              content: const Text('Saved to library'),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
                           );
                         },
                         onRetry: _retry,
@@ -185,6 +175,8 @@ class _AnalyzeScreenState extends ConsumerState<AnalyzeScreen> {
   }
 }
 
+// ─── Idle hint ──────────────────────────────────────────────────────────────
+
 class _IdleHint extends StatelessWidget {
   final VoidCallback onPickGallery;
   final VoidCallback onTakePhoto;
@@ -199,13 +191,18 @@ class _IdleHint extends StatelessWidget {
     return Column(
       children: [
         const SizedBox(height: 48),
-        Icon(
-          Icons.screenshot_rounded,
-          size: 96,
-          color: Theme.of(context)
-              .colorScheme
-              .onSurfaceVariant
-              .withOpacity(0.4),
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.06),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.screenshot_rounded,
+            size: 48,
+            color: AppColors.primary.withOpacity(0.3),
+          ),
         ),
         const SizedBox(height: 24),
         Text(
@@ -217,7 +214,7 @@ class _IdleHint extends StatelessWidget {
           'Tap the share button in any app and choose\n"Saved Content Graveyard"',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: AppColors.textSecondary,
               ),
         ),
         const SizedBox(height: 32),
@@ -242,31 +239,89 @@ class _IdleHint extends StatelessWidget {
   }
 }
 
-class _LoadingView extends StatelessWidget {
+// ─── Loading view ───────────────────────────────────────────────────────────
+
+class _LoadingView extends StatefulWidget {
   const _LoadingView();
+
+  @override
+  State<_LoadingView> createState() => _LoadingViewState();
+}
+
+class _LoadingViewState extends State<_LoadingView>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const SizedBox(height: 96),
-        const CircularProgressIndicator(),
-        const SizedBox(height: 24),
+        const SizedBox(height: 64),
+        FadeTransition(
+          opacity: _pulse,
+          child: Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.auto_awesome,
+              size: 36,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 28),
         Text(
-          'Analyzing screenshot...',
-          style: Theme.of(context).textTheme.bodyLarge,
+          'Analyzing your screenshot...',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Identifying product and streaming options',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+          'Identifying content and finding the best links',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: 200,
+          child: LinearProgressIndicator(
+            backgroundColor: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
         ),
       ],
     );
   }
 }
+
+// ─── Error view ─────────────────────────────────────────────────────────────
 
 class _ErrorView extends StatelessWidget {
   final String message;
@@ -286,13 +341,38 @@ class _ErrorView extends StatelessWidget {
     return Column(
       children: [
         const SizedBox(height: 48),
-        Icon(
-          Icons.error_outline,
-          size: 72,
-          color: Theme.of(context).colorScheme.error,
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: AppColors.error.withOpacity(0.08),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.error_outline_rounded,
+            size: 40,
+            color: AppColors.error,
+          ),
         ),
         const SizedBox(height: 24),
-        Text(message, textAlign: TextAlign.center),
+        Text(
+          'Oops, something went wrong',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
