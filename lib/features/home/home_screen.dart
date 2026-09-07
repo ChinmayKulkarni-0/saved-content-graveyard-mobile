@@ -1,57 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_theme.dart';
-import '../analyze/presentation/analyze_screen.dart';
-
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  final List<Widget> _screens = [
-    const _LibraryTab(),
-    const AnalyzeScreen(),
-    const _SettingsTab(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _screens[_selectedIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.bookmark_outline),
-            selectedIcon: Icon(Icons.bookmark),
-            label: 'Library',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.qr_code_scanner),
-            selectedIcon: Icon(Icons.qr_code_scanner),
-            label: 'Scan',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LibraryTab extends StatelessWidget {
-  const _LibraryTab();
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +34,7 @@ class _LibraryTab extends StatelessWidget {
               Text(
                 'Screenshots you saved with buy & watch links',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
               ),
               const SizedBox(height: 32),
@@ -96,22 +46,23 @@ class _LibraryTab extends StatelessWidget {
                       Icon(
                         Icons.inbox_outlined,
                         size: 80,
-                        color: AppColors.textSecondary.withOpacity(0.4),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant
+                            .withOpacity(0.4),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'No saved items yet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Share a screenshot to save your first item',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color:
+                                  Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
                       ),
                     ],
                   ),
@@ -120,20 +71,6 @@ class _LibraryTab extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SettingsTab extends StatelessWidget {
-  const _SettingsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: const Center(
-        child: Text('Settings coming soon'),
       ),
     );
   }
