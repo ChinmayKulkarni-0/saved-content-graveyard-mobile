@@ -7,6 +7,7 @@
 - Clean, modern, delightful UI
 - Support iOS Share Sheet first
 - Offline handling + good error states
+- Follow `api-contract.md` (mirror of the backend contract). Implement response shapes 1:1.
 
 # Code Standards
 
